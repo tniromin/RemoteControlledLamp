@@ -17,4 +17,5 @@
 
 <img src="Images/Wokwi.png" alt="Wokwi Impmentation">
 
+> Following is the final Implementation related c, where arduino library was not used. Therefore pwm ports were used for LEDs to control their brigthness, PB0 which is the ICP1 pin which is used to get external changes from sensors was assigned to Recieving end of the IR sensor. RGB can be assigned to the rest of the reamaining pins. 
 <img src="Images/v2.png">
