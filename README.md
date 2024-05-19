@@ -15,5 +15,6 @@
 > The following is prelliminary implementation done in wokwi. 
 <a href="https://wokwi.com/projects/394660328114198529">Simulation</a>
 
-<img src="/Images/Wokwi.png" alt="Wokwi Impmentation">
+<img src="Images/Wokwi.png" alt="Wokwi Impmentation">
 
+<img src="Images/v2.png">
