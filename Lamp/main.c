@@ -59,7 +59,7 @@ void initRGB(){
 	DDRD |= _BV(DDD2);
 	DDRD |= _BV(DDD4);
 	DDRD |= _BV(DDD7);
-	
+	2
 }
 
 //Light Order
