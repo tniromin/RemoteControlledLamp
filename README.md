@@ -3,6 +3,13 @@
 > I used c instead of using arduino IDE to apply the content that we learnt during this year.
 > Assembly was not used due to time restriction and limitations.
 
+# Directory
+## Lamp
+> Implementation of the Remote Controlled Lamp.
+
+## Demo
+> Useful demos to help programmers understand AVR C and the code better.
+
 # Functionality
 > The Lamp is intended to be operated using a remote control where the up and down buttons controls a sequence of LEDs with a 
 > preprogrammed ligthing pattern.
