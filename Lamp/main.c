@@ -3,241 +3,161 @@
  *
  * Created: 5/14/2024 11:59:08 PM
  * Author : Tniromin
- * ATmega328ps
- * IRremote Library by Liviu Istrate::https://www.blogger.com/profile/15953813368190792312
- */ 
+ * ATmega328p
+ * Description: This program controls an RGB LED lamp with adjustable brightness and modes using an IR remote.
+ * Uses IRremote Library by Liviu Istrate: https://www.blogger.com/profile/15953813368190792312
+ */
 
 #include <avr/io.h>
 #include <util/delay.h>
-#include <avr/interrupt.h> 
+#include <avr/interrupt.h>
 #include "IRremote.h"
 
 #define F_CPU 16000000UL
 
-//Define Codes 
+// Define IR Remote Command Codes
+#define VOL_UP 0x2
+#define VOL_DOWN 0x3
+#define KEY_UP 0x0
+#define KEY_DOWN 0x1
 
-#define vol_up 0x2
-#define vol_down 0x3
-#define key_up 0x0
-#define key_down 0x1
-//#define  power 0x8
+// Global Variables
+uint8_t brightness = 255;  // LED brightness level
+uint8_t mode = 0;          // LED mode, controls the LED pattern
 
+// Initialize PWM settings for LED control
+void initPWM() {
+    // Reset Timer registers to 0
+    TCCR0A = TCCR0B = TCCR2A = TCCR2B = 0;
 
-uint8_t brightness = 255;
-uint8_t mode = 0;
+    // Set pins as outputs for PWM control on Timer0 (D5, D6) and Timer2 (D3, B3)
+    DDRD |= (1 << DDD5) | (1 << DDD6) | (1 << DDD3);
+    DDRB |= (1 << DDB3);
 
-void initPWM(){
-	// Reset Timer registers to 0
-	TCCR0A = 0;
-	TCCR0B = 0;
-	TCCR2A = 0;
-	TCCR2B = 0;
-	
-	// Set Pins to Output
-	DDRD |= _BV(DDD5);
-	DDRD |= _BV(DDD6);
-	DDRD |= _BV(DDD3);
-	DDRB |= _BV(DDB3);
-	
-	// TCCR0A [ COM0A1 0 COM0B1 0 0 0 WGM01 WGM00 ] = 0b10100011
-	TCCR0A = _BV(COM0A1) | _BV(COM0B1) | _BV(WGM01) | _BV(WGM00);
+    // Configure Timer0 and Timer2 for Fast PWM mode with prescaler of 64
+    TCCR0A = (1 << COM0A1) | (1 << COM0B1) | (1 << WGM01) | (1 << WGM00);  // Fast PWM, clear OC0A/OC0B on compare match
+    TCCR0B = (1 << CS01) | (1 << CS00);                                    // Prescaler 64
 
-	// Previous code will start from dim light LEDs
-	//TCCR0A = _BV(WGM01) | _BV(WGM00);
-	
-	// TCCR0B [ FOC2A FOC2B 0 0 WGM02 CS02 CS01 CS00 ] = 0b00000011
-	TCCR0B = _BV(CS01) | _BV(CS00); // Fast PWM set upper to 0xFF
-	
-	// For Pin set 3 and 11
-	TCCR2A = _BV(COM2A1) | _BV(COM2B1) | _BV(WGM21) | _BV(WGM20);
-	//TCCR2A =  _BV(WGM21) | _BV(WGM20);
-	TCCR2B = _BV(CS21) | _BV(CS20);
-	
+    TCCR2A = (1 << COM2A1) | (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);  // Fast PWM, clear OC2A/OC2B on compare match
+    TCCR2B = (1 << CS21) | (1 << CS20);                                    // Prescaler 64
 }
 
-void initRGB(){
-	DDRD |= _BV(DDD2);
-	DDRD |= _BV(DDD4);
-	DDRD |= _BV(DDD7);
-	2
+// Initialize RGB pins for direct control
+void initRGB() {
+    DDRD |= (1 << DDD2) | (1 << DDD4) | (1 << DDD7);  // Set PD2, PD4, PD7 as outputs
 }
 
-//Light Order
-/// Using register u can cease connection to ports
-//// ORC2A -> TCCR2A -> COM2A1 
-//// ORC0A -> TCCR0A -> COM0A1
-//// ORC0B -> TCCR0B -> COM0B1
-//// ORC2B -> TCCR2B -> COM2B1
-
-
-// Controls the LEDs
-// To set brightness can go with another function but lets go with this
-void set_Pin(){
-	switch(mode){
-		case 0:
-			TCCR2A &= ~(_BV(COM2A1));
-			break;
-		
-		case 1:
-			TCCR2A |= _BV(COM2A1);
-			OCR2A = brightness;
-			TCCR0A &= ~(_BV(COM0A1));
-			
-			break;
-		case 2:
-			TCCR2A |= _BV(COM2A1);
-			TCCR0A |= _BV(COM0A1);
-			OCR2A = brightness;
-			OCR0A = brightness;
-			TCCR0A &= ~(_BV(COM0B1));
-			break;
-			
-		case 3:
-			TCCR2A |= _BV(COM2A1);
-			TCCR0A |= _BV(COM0A1);
-			TCCR0A |= _BV(COM0B1);
-			OCR2A = brightness;
-			OCR0A = brightness;
-			OCR0B = brightness;
-			TCCR2A &= ~(_BV(COM2B1));
-			break;
-			
-		case 4:
-			TCCR2A |= _BV(COM2A1);
-			TCCR0A |= _BV(COM0A1);
-			TCCR0A |= _BV(COM0B1);
-			TCCR2A |= _BV(COM2B1);
-			OCR2A = brightness;
-			OCR0A = brightness;
-			OCR0B = brightness;
-			OCR2B = brightness;
-			
-			PORTD &= ~(1 << PD2);
-			PORTD &= ~(1 << PD4);
-			PORTD &= ~(1 << PD7);
-			break;
-		case 5:
-			OCR2A = brightness;
-			OCR0A = brightness;
-			OCR0B = brightness;
-			OCR2B = brightness;
-		
-			PORTD|= (1 << PD2);
-			PORTD |= (1 << PD4);
-			PORTD &= ~(1 << PD7);
-			break;
-		case 6:
-			OCR2A = brightness;
-			OCR0A = brightness;
-			OCR0B = brightness;
-			OCR2B = brightness;
-			
-			PORTD |= (1 << PD2);
-			PORTD &= ~(1 << PD4);
-			PORTD |= (1 << PD7);
-			break;
-		case 7:
-			OCR2A = brightness;
-			OCR0A = brightness;
-			OCR0B = brightness;
-			OCR2B = brightness;
-			
-			PORTD &= ~(1 << PD2);
-			PORTD |= (1 << PD4);
-			PORTD |= (1 << PD7);
-			break;
-	}
-}
-
-
-// Using multiples of 255 to avoid bit flips beyond or below 255, 0 respectively
-// 17-> 15 bright levels ,51 -> 5 Bright levels,85 -> 3 levels
-
-void vol_Up(){
-	
-	if (brightness < 255){
-		brightness += 51;
-	}
-	set_Pin();
-}
-
-void vol_Down(){
-	
-	if (brightness > 0){
-		brightness -= 51;
-	}
-	set_Pin();
-}
-
-void key_Up(){
-	if (mode < 7){
-		mode++;
-		set_Pin();
-	}
-}
-
-void key_Down(){
-	if (mode > 0){
-		mode--;
-		set_Pin();
-	}
-}
-
-void check_command(uint16_t code){
-	switch(code){
-		case vol_up:
-			vol_Up();
-			break;
-		case vol_down:
-			vol_Down();
-			break;
-		case key_up:
-			key_Up();
-			break;
-		case key_down:
-			key_Down();
-			break;
-	}
-}
-
-void set_initial(){
-	TCCR2A &= ~(_BV(COM2A1));
-	TCCR0A &= ~(_BV(COM0B1));
-	TCCR0A &= ~(_BV(COM0A1));
-	TCCR2A &= ~(_BV(COM2B1));
-}
-
-int main(void)
-{	
-	uint16_t address = 0; // Variable to store IR address
-	uint16_t command = 0; // Variable to store IR command
-    
-	initPWM();
-	initRGB();
-	IR_init();
-	
-	set_initial(); // Sets to initial State
-	
-    while (1) 
-    {	
-		//DDRD |= (1 << DDD4);
-		
-		if (IR_codeAvailable()) { // Check if IR code is available
-			//Debug
-			//PORTD |= (1<<PD4);
-			//_delay_ms(2000);
-			if (!IR_isRepeatCode()) { // Check if IR code is not a repeat
-				IR_getCode(&address, &command); // Get IR address and command
-				check_command(command);
-				
-				//PORTD |= (1<<PD4);
-				//_delay_ms(2000);
-				
-				
-			}
-			
-		}
-		
+// Set the LED pins based on the current mode
+void set_LED_Pins() {
+    // Configure each mode to activate or deactivate specific LEDs
+    switch (mode) {
+        case 0: TCCR2A &= ~(1 << COM2A1); break;  // Mode 0: All LEDs off
+        case 1:
+            TCCR2A |= (1 << COM2A1);
+            OCR2A = brightness;
+            TCCR0A &= ~(1 << COM0A1);
+            break;
+        case 2:
+            TCCR2A |= (1 << COM2A1);
+            TCCR0A |= (1 << COM0A1);
+            OCR2A = OCR0A = brightness;
+            TCCR0A &= ~(1 << COM0B1);
+            break;
+        case 3:
+            TCCR2A |= (1 << COM2A1);
+            TCCR0A |= (1 << COM0A1) | (1 << COM0B1);
+            OCR2A = OCR0A = OCR0B = brightness;
+            TCCR2A &= ~(1 << COM2B1);
+            break;
+        case 4:
+            TCCR2A |= (1 << COM2A1);
+            TCCR0A |= (1 << COM0A1) | (1 << COM0B1);
+            TCCR2A |= (1 << COM2B1);
+            OCR2A = OCR0A = OCR0B = OCR2B = brightness;
+            PORTD &= ~((1 << PD2) | (1 << PD4) | (1 << PD7));
+            break;
+        case 5:
+            OCR2A = OCR0A = OCR0B = OCR2B = brightness;
+            PORTD |= (1 << PD2) | (1 << PD4);
+            PORTD &= ~(1 << PD7);
+            break;
+        case 6:
+            OCR2A = OCR0A = OCR0B = OCR2B = brightness;
+            PORTD |= (1 << PD2) | (1 << PD7);
+            PORTD &= ~(1 << PD4);
+            break;
+        case 7:
+            OCR2A = OCR0A = OCR0B = OCR2B = brightness;
+            PORTD |= (1 << PD4) | (1 << PD7);
+            PORTD &= ~(1 << PD2);
+            break;
     }
 }
 
+// Adjust brightness, increment by 51 up to a max of 255
+void increaseBrightness() {
+    if (brightness < 255) {
+        brightness += 51;
+    }
+    set_LED_Pins();
+}
+
+// Adjust brightness, decrement by 51 down to a min of 0
+void decreaseBrightness() {
+    if (brightness > 0) {
+        brightness -= 51;
+    }
+    set_LED_Pins();
+}
+
+// Increase mode (pattern), cycling up to max mode (7)
+void nextMode() {
+    if (mode < 7) {
+        mode++;
+        set_LED_Pins();
+    }
+}
+
+// Decrease mode (pattern), cycling down to min mode (0)
+void previousMode() {
+    if (mode > 0) {
+        mode--;
+        set_LED_Pins();
+    }
+}
+
+// Map received IR command to respective functions
+void executeCommand(uint16_t command) {
+    switch (command) {
+        case VOL_UP: increaseBrightness(); break;
+        case VOL_DOWN: decreaseBrightness(); break;
+        case KEY_UP: nextMode(); break;
+        case KEY_DOWN: previousMode(); break;
+    }
+}
+
+// Initialize the lamp to an all-off state
+void resetLamp() {
+    TCCR2A &= ~(1 << COM2A1);
+    TCCR0A &= ~(1 << COM0A1) & ~(1 << COM0B1);
+    TCCR2A &= ~(1 << COM2B1);
+}
+
+int main(void) {
+    uint16_t address = 0;  // Variable to store IR address
+    uint16_t command = 0;  // Variable to store IR command
+
+    initPWM();
+    initRGB();
+    IR_init();
+    resetLamp();  // Start in all-off state
+
+    while (1) {
+        if (IR_codeAvailable()) {  // Check if IR code is available
+            if (!IR_isRepeatCode()) {  // Ignore repeat codes
+                IR_getCode(&address, &command);  // Fetch IR address and command
+                executeCommand(command);         // Execute command based on IR input
+            }
+        }
+    }
+}
